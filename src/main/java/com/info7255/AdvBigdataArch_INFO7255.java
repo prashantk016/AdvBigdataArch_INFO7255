@@ -8,9 +8,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableAutoConfiguration
 @ComponentScan("com.info7255")
-public class BigdataclassprojectApplication {
+public class AdvBigdataArch_INFO7255 {
 
 	public static void main(String[] args) {
-		SpringApplication.run(BigdataclassprojectApplication.class, args);
+		SpringApplication.run(AdvBigdataArch_INFO7255.class, args);
 	}
 }
