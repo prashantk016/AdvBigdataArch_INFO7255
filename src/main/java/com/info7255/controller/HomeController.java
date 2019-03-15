@@ -5,7 +5,9 @@ import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
 
 import javax.crypto.Cipher;
@@ -40,9 +42,11 @@ public class HomeController {
 	@Autowired
 	private JedisBean jedisBean;
 	
-	private String key = "qwertyuiopasdfghjklzxcvbnm";
-	private String algorithm = "DESede";
+	private String key = "ssdkF$HUy2A#D%kd";
+	private String algorithm = "AES";
 	
+	Map<String, String> m = new HashMap<String, String>();
+
 	@RequestMapping("/")
 	public String home() {
 		return "Welcome!";
@@ -50,10 +54,11 @@ public class HomeController {
 
 	
 	@GetMapping("/plan/{id}")
-	public ResponseEntity<String> read(@PathVariable(name="id", required=true) String id, @RequestHeader HttpHeaders requestHeaders) {
-		
+	public ResponseEntity<Map<String, String>> read(@PathVariable(name="id", required=true) String id, @RequestHeader HttpHeaders requestHeaders) {
+		m.clear();
 		if(!authorize(requestHeaders)) {
-			return new ResponseEntity<String>("Token authorization failed", HttpStatus.NOT_ACCEPTABLE);
+			m.put("message", "Token authorization failed");
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.NOT_ACCEPTABLE);
 		}
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(MediaType.APPLICATION_JSON);
@@ -62,79 +67,98 @@ public class HomeController {
 		{
 			System.out.println("Reading");
 			String jsonString = jedisBean.read(id);
-			if(jsonString != null)
-				return new ResponseEntity<String>(jsonString, headers, HttpStatus.OK);
-			else
-				return new ResponseEntity<String>("Read unsuccessfull", headers, HttpStatus.BAD_REQUEST);}
-		return new ResponseEntity<String>("Read unsuccessfull", headers, HttpStatus.NOT_MODIFIED);
+			if(jsonString != null) {
+				m.put("message", jsonString);
+				return new ResponseEntity<>(m, headers, HttpStatus.OK);
+				}
+			else {
+				m.put("message", "Read unsuccessful");
+				return new ResponseEntity<>(m, headers, HttpStatus.BAD_REQUEST);}
+		}
+		
+		return new ResponseEntity<Map<String, String>>(m, headers, HttpStatus.NOT_MODIFIED);
 
 	}
 	
 	
 	@PostMapping("/plan")
-	public ResponseEntity<String> insert(@RequestBody(required=true) String body, @RequestHeader HttpHeaders requestHeaders) {
-		
+	public ResponseEntity<Map<String, String>> insert(@RequestBody(required=true) String body, @RequestHeader HttpHeaders requestHeaders) {
+		m.clear();
 		if(!authorize(requestHeaders)) {
-			return new ResponseEntity<String>("Token authorization failed", HttpStatus.NOT_ACCEPTABLE);
+			m.put("message", "Token authorization failed");
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.NOT_ACCEPTABLE);
 		}
 		
 		Schema schema = validator.getSchema();
-		if(schema == null)
-			return new ResponseEntity<String>("schema file not found exception", HttpStatus.BAD_REQUEST);
-		
+		if(schema == null) {
+			m.put("message", "Schema file not found exception");
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.BAD_REQUEST);
+		}
 		JSONObject jsonObject = validator.getJsonObjectFromString(body);
 		
 		if(validator.validate(jsonObject)) {
 			String uuid = jedisBean.insert(jsonObject);
-			return new ResponseEntity<String>("Inserted with id "+uuid, HttpStatus.ACCEPTED);
+			m.put("message", "Added successfully");
+			m.put("id",uuid);
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.CREATED);
 		}
 		else {
-			return new ResponseEntity<String>("invalid", HttpStatus.BAD_REQUEST);
+			m.put("message","Validation failed");
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.BAD_REQUEST);
 		}
 			
 	}
 	
 
 	@DeleteMapping("/plan")
-	public ResponseEntity<String> delete(@RequestBody(required=true) String body, @RequestHeader HttpHeaders requestHeaders) {
-		
+	public ResponseEntity<Map<String, String>> delete(@RequestBody(required=true) String body, @RequestHeader HttpHeaders requestHeaders) {
+		m.clear();
 		if(!authorize(requestHeaders)) {
-			return new ResponseEntity<String>("Token authorization failed", HttpStatus.NOT_ACCEPTABLE);
+			m.put("message", "Token authorization failed");
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.NOT_ACCEPTABLE);
 		}
 		
 		if (jedisBean.delete(body)) {
-			return new ResponseEntity<String>("Deleted successfully", HttpStatus.ACCEPTED);
+			m.put("message", "Deleted successfully");
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.ACCEPTED);
 		}
 		else
-			return new ResponseEntity<String>("Deletion unsuccessfull", HttpStatus.BAD_REQUEST);
+		{	m.put("message", "Deleted failed");
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.BAD_REQUEST);
+		}
 	}
 	
 	@PutMapping("/plan")
-	public ResponseEntity<String> update(@RequestBody(required=true) String body, @RequestHeader HttpHeaders headers) {
-		
+	public ResponseEntity<Map<String, String>> update(@RequestBody(required=true) String body, @RequestHeader HttpHeaders headers) {
+		m.clear();
 		if(!authorize(headers)) {
-			System.out.println("Authorization passed");
-			return new ResponseEntity<String>("Token authorization failed", HttpStatus.NOT_ACCEPTABLE);
+			m.put("message", "Token authorization failed");
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.NOT_ACCEPTABLE);
 		}
 		
 		Schema schema = validator.getSchema();
-		if(schema == null)
-			return new ResponseEntity<String>("schema file not found exception", HttpStatus.BAD_REQUEST);
+		if(schema == null) {
+			m.put("message", "No schema found!");
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.BAD_REQUEST);
+				
+		}
 		
 		System.out.println("Schema retreived succesfully");
 		JSONObject jsonObject = validator.getJsonObjectFromString(body);
 		
-		if(!jedisBean.update(jsonObject))
-			return new ResponseEntity<String>("Failed to update JSON instance in Redis", HttpStatus.BAD_REQUEST);
-		
-		System.out.println("");
-		return new ResponseEntity<String>("JSON instance updated in redis", HttpStatus.ACCEPTED);
+		if(!jedisBean.update(jsonObject)) {
+			m.put("message", "Failed to update JSON instance in Redis");
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.BAD_REQUEST);
+		}
+	
+		m.put("message", "JSON instance updated in redis");
+		return new ResponseEntity<Map<String, String>>(m, HttpStatus.ACCEPTED);
 	
 	}
 	
 	@GetMapping("/token")
-	public ResponseEntity<String> createToken() {
-		
+	public ResponseEntity<Map<String, String>> createToken() {
+		m.clear();
 		JSONObject jsonToken = new JSONObject ();
 		jsonToken.put("Issuer", "Prashant");
 		
@@ -159,11 +183,13 @@ public class HomeController {
 			c.init(Cipher.ENCRYPT_MODE, spec);
 			byte[] encrBytes = c.doFinal(token.getBytes());
 			String encoded = Base64.getEncoder().encodeToString(encrBytes);
-			return new ResponseEntity<String>(encoded, HttpStatus.ACCEPTED);
+			m.put("token", encoded);
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.ACCEPTED);
 			
 		} catch (Exception e) {
 			e.printStackTrace();
-			return new ResponseEntity<String>("Token creation failed", HttpStatus.NOT_ACCEPTABLE);
+			m.put("message", "Token creation failed. Please try again.");
+			return new ResponseEntity<Map<String, String>>(m, HttpStatus.NOT_ACCEPTABLE);
 		}
 		
 	}
@@ -173,6 +199,8 @@ public class HomeController {
 	}
 	
 	private boolean authorize(HttpHeaders headers) {
+		if(headers.getFirst("Authorization")== null)
+			return false;
 		
 		String token = headers.getFirst("Authorization").substring(7);
 		byte[] decrToken = Base64.getDecoder().decode(token);

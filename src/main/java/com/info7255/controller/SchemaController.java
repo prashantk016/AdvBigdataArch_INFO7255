@@ -1,5 +1,8 @@
 package com.info7255.controller;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -20,19 +23,26 @@ public class SchemaController {
 	@Autowired
 	private JedisBean jedisBean;
 	
-	@PostMapping("/Plan/Schema")
-	public ResponseEntity<String> insertSchema(@RequestBody(required=true) String body) {
+	Map<String, String> m = new HashMap<String, String>();
+	
+	@PostMapping("/plan/schema")
+	public  ResponseEntity<Map<String, String>> insertSchema(@RequestBody(required=true) String body) {
+		
+		m.clear();
 		if(body == null) {
-			return new ResponseEntity<String>("No Schema received", new HttpHeaders(), HttpStatus.BAD_REQUEST);
+			m.put("message","Schema not recieved");
+			return new ResponseEntity<>(m, new HttpHeaders(), HttpStatus.BAD_REQUEST);
 		}
 		// receive token and validate
 		
 		// set json schema in redis
-		if(!jedisBean.insertSchema(body))
-			return new ResponseEntity<String>("Schema insertion failed", new HttpHeaders(), HttpStatus.BAD_REQUEST);
-		
+		if(!jedisBean.insertSchema(body)) {
+			m.put("message","Schema insertion failed");
+			return new ResponseEntity<>(m, new HttpHeaders(), HttpStatus.BAD_REQUEST);
+		}
 		validator.refreshSchema();
-		return new ResponseEntity<String>("Schema posted successfully", new HttpHeaders(), HttpStatus.ACCEPTED);
+		m.put("message","Schema posted successfully");
+		return new ResponseEntity<>(m, new HttpHeaders(), HttpStatus.ACCEPTED);
 	}
 	
 
