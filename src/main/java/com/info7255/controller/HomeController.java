@@ -43,6 +43,8 @@ public class HomeController {
 	private MyJsonValidator validator;
 	@Autowired
 	private JedisBean jedisBean;
+	@Autowired
+	private ElasticSearchConnect elasticSearchConnect;
 	
 	private String key = "qwertyuiopasdfghjklzxcvbnm";
 	private String algorithm = "DESede";
@@ -51,7 +53,6 @@ public class HomeController {
 	public String home() {
 		return "Welcome!";
 	}
-
 	
 	@GetMapping("/plan/{id}")
 	public ResponseEntity<String> read(@PathVariable(name="id", required=true) String id, @RequestHeader HttpHeaders requestHeaders) {
@@ -74,7 +75,6 @@ public class HomeController {
 
 	}
 	
-	
 	@PostMapping("/plan")
 	public ResponseEntity<String> insert(@RequestBody(required=true) String body, @RequestHeader HttpHeaders requestHeaders) {
 		
@@ -90,6 +90,7 @@ public class HomeController {
 		
 		if(validator.validate(jsonObject)) {
 			String uuid = jedisBean.insert(jsonObject);
+			elasticSearchConnect.runTask(uuid, jsonObject);
 			return new ResponseEntity<String>("Inserted with id "+uuid, HttpStatus.ACCEPTED);
 		}
 		else {
@@ -98,7 +99,7 @@ public class HomeController {
 			
 	}
 	
-
+	
 	@DeleteMapping("/plan")
 	public ResponseEntity<String> delete(@RequestBody(required=true) String body, @RequestHeader HttpHeaders requestHeaders) {
 		
@@ -106,12 +107,13 @@ public class HomeController {
 			return new ResponseEntity<String>("Token authorization failed", HttpStatus.NOT_ACCEPTABLE);
 		}
 		
-		if (jedisBean.delete(body)) {
+		if (jedisBean.delete(body) && elasticSearchConnect.deleteTask(body)) {
 			return new ResponseEntity<String>("Deleted successfully", HttpStatus.ACCEPTED);
 		}
 		else
 			return new ResponseEntity<String>("Deletion unsuccessfull", HttpStatus.BAD_REQUEST);
 	}
+	
 	
 	@PutMapping("/plan")
 	public ResponseEntity<String> update(@RequestBody(required=true) String body, @RequestHeader HttpHeaders headers) {
@@ -132,6 +134,7 @@ public class HomeController {
 			return new ResponseEntity<String>("Failed to update JSON instance in Redis", HttpStatus.BAD_REQUEST);
 		
 		System.out.println("");
+		elasticSearchConnect.runTask(jsonObject.getString("objectId"), jsonObject);
 		return new ResponseEntity<String>("JSON instance updated in redis", HttpStatus.ACCEPTED);
 	
 	}
@@ -143,7 +146,7 @@ public class HomeController {
 		jsonToken.put("Issuer", "Prashant");
 		
 		TimeZone tz = TimeZone.getTimeZone("UTC");
-		DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'"); 
+		DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'");
 		df.setTimeZone(tz);
 		
 		Calendar calendar = Calendar.getInstance();
