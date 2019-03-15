@@ -9,13 +9,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.info7255.beans.JedisBean;
-import com.info7255.beans.MyJsonValidator;
+import com.info7255.beans.JSONValidator;
 
 @RestController
 public class SchemaController {
 	
 	@Autowired
-	private MyJsonValidator validator;
+	private JSONValidator validator;
 	
 	@Autowired
 	private JedisBean jedisBean;
