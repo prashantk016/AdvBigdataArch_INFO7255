@@ -14,13 +14,13 @@ import org.json.JSONTokener;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-public class MyJsonValidator {
+public class JSONValidator {
 	
 	private Schema schema;
 	private JedisBean jedisBean;
 	
 	// constructor
-	public MyJsonValidator(JedisBean j) {
+	public JSONValidator(JedisBean j) {
 		jedisBean = j;
 	}
 	
@@ -36,7 +36,8 @@ public class MyJsonValidator {
 	// refresh schema
 	public void refreshSchema() {
 		String schemaString = jedisBean.getSchema();
-		schema = SchemaLoader.load(new JSONObject(new JSONTokener(new ByteArrayInputStream(schemaString.getBytes()))));
+		if(schemaString!=null)
+			schema = SchemaLoader.load(new JSONObject(new JSONTokener(new ByteArrayInputStream(schemaString.getBytes()))));
 	}
 	
 	
