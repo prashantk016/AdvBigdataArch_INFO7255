@@ -36,7 +36,8 @@ public class JSONValidator {
 	// refresh schema
 	public void refreshSchema() {
 		String schemaString = jedisBean.getSchema();
-		schema = SchemaLoader.load(new JSONObject(new JSONTokener(new ByteArrayInputStream(schemaString.getBytes()))));
+		if(schemaString!=null)
+			schema = SchemaLoader.load(new JSONObject(new JSONTokener(new ByteArrayInputStream(schemaString.getBytes()))));
 	}
 	
 	
