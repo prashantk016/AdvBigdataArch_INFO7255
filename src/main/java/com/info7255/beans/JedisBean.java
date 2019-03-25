@@ -163,7 +163,7 @@ public class JedisBean {
 		}
 	}
 
-	public boolean update(JSONObject jsonObject) {
+	public boolean patch(JSONObject jsonObject) {
 		try {
 			Jedis jedis = pool.getResource();
 			String uuid = jsonObject.getString("objectType") + SEP + jsonObject.getString("objectId");
@@ -188,7 +188,7 @@ public class JedisBean {
 					String setKey = uuid + SEP + edge;
 					String embd_uuid = embdObject.get("objectType") + SEP + embdObject.getString("objectId");
 					jedis.sadd(setKey, embd_uuid);
-					update(embdObject);
+					patch(embdObject);
 
 				} else if (attributeVal instanceof JSONArray) {
 
@@ -200,7 +200,7 @@ public class JedisBean {
 						JSONObject embdObject = (JSONObject) jsonIterator.next();
 						String embd_uuid = embdObject.get("objectType") + SEP + embdObject.getString("objectId");
 						jedis.sadd(setKey, embd_uuid);
-						update(embdObject);
+						patch(embdObject);
 					}
 
 				} else {
@@ -217,6 +217,18 @@ public class JedisBean {
 		}
 	}
 
+	public boolean replace(JSONObject body) {
+		
+		try {
+			return insert(body)!=null?true:false;
+			
+		}catch (Exception e) {
+			e.printStackTrace();
+			return false;
+		}
+		
+	}
+	
 	public boolean delete(String body) {
 		JSONObject json = new JSONObject(body);
 		if (!json.has("objectType") || !json.has("objectId"))

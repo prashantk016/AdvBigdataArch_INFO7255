@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.info7255.beans.EtagManager;
@@ -105,9 +106,13 @@ public class HomeController {
 
 		if (validator.validate(jsonObject)) {
 			String uuid = jedisBean.insert(jsonObject);
+			String etag=etagManager.getETag(jsonObject);
+			
+			HttpHeaders responseHeader=new HttpHeaders();
+			responseHeader.setETag(etag);
 			m.put("message", "Added successfully");
 			m.put("id", uuid);
-			return new ResponseEntity<Map<String, Object>>(m, HttpStatus.CREATED);
+			return new ResponseEntity<Map<String, Object>>(m,responseHeader, HttpStatus.CREATED);
 		} else {
 			m.put("message", "Validation failed");
 			return new ResponseEntity<Map<String, Object>>(m, HttpStatus.BAD_REQUEST);
@@ -133,8 +138,8 @@ public class HomeController {
 		}
 	}
 
-	@PutMapping(value = "/plan", produces = MediaType.APPLICATION_JSON_VALUE, consumes = "application/json")
-	public ResponseEntity<Map<String, Object>> update(@RequestBody(required = true) String body,
+	@RequestMapping(method= RequestMethod.PATCH,value = "/plan/{planID}", produces = MediaType.APPLICATION_JSON_VALUE, consumes = "application/json")
+	public ResponseEntity<Map<String, Object>> update(@PathVariable(name = "planID", required = true) String planID,@RequestBody(required = true) String body,
 			@RequestHeader HttpHeaders requestHeaders) {
 		m.clear();
 		if (!authorize(requestHeaders)) {
@@ -146,7 +151,6 @@ public class HomeController {
 		if (schema == null) {	
 			m.put("message", "No schema found!");
 			return new ResponseEntity<Map<String, Object>>(m, HttpStatus.NOT_FOUND);
-
 		}
 		
 		
@@ -155,17 +159,17 @@ public class HomeController {
 		HttpHeaders responseHeaders = new HttpHeaders();
 		responseHeaders.setContentType(MediaType.APPLICATION_JSON);
 		
-		JSONObject planJSON=jedisBean.read(jsonObject.getString("PlanID"));
+		JSONObject planJSON=jedisBean.read(planID);
 		if(planJSON!=null)
 		{
 			String etag = etagManager.getETag(planJSON);
 			if (etagManager.verifyETag(planJSON, requestHeaders.getIfMatch())) {
 			
-				if (!jedisBean.update(jsonObject)) {
+				if (!jedisBean.patch(jsonObject)) {
 					m.put("message", "Update failed");
 					return new ResponseEntity<Map<String, Object>>(m, HttpStatus.BAD_REQUEST);
 				}
-				String newETag=etagManager.getETag(jedisBean.read(jsonObject.getString("PlanID")));
+				String newETag=etagManager.getETag(jedisBean.read(planID));
 				responseHeaders.setETag(newETag);
 				return new ResponseEntity<Map<String, Object>>(m, responseHeaders, HttpStatus.NO_CONTENT);
 			} else {
@@ -186,7 +190,58 @@ public class HomeController {
 		return new ResponseEntity<Map<String, Object>>(m, HttpStatus.BAD_REQUEST);
 		}
 	}
+	@RequestMapping(method= RequestMethod.PUT,value = "/plan/{planID}", produces = MediaType.APPLICATION_JSON_VALUE, consumes = "application/json")
+	public ResponseEntity<Map<String, Object>> update1(@PathVariable(name = "planID", required = true) String planID,@RequestBody(required = true) String body,
+			@RequestHeader HttpHeaders requestHeaders) {
+		m.clear();
+		if (!authorize(requestHeaders)) {
+			m.put("message", "Authorization failed");
+			return new ResponseEntity<Map<String, Object>>(m, HttpStatus.UNAUTHORIZED);
+		}
 
+		Schema schema = validator.getSchema();
+		if (schema == null) {	
+			m.put("message", "No schema found!");
+			return new ResponseEntity<Map<String, Object>>(m, HttpStatus.NOT_FOUND);
+		}
+		
+		
+		JSONObject jsonObject = validator.getJsonObjectFromString(body);
+
+		HttpHeaders responseHeaders = new HttpHeaders();
+		responseHeaders.setContentType(MediaType.APPLICATION_JSON);
+		
+		JSONObject planJSON=jedisBean.read(planID);
+		if(planJSON!=null)
+		{
+			String etag = etagManager.getETag(planJSON);
+			if (etagManager.verifyETag(planJSON, requestHeaders.getIfMatch())) {
+			
+				if (!jedisBean.replace(jsonObject)) {
+					m.put("message", "Update failed");
+					return new ResponseEntity<Map<String, Object>>(m, HttpStatus.BAD_REQUEST);
+				}
+				String newETag=etagManager.getETag(jedisBean.read(planID));
+				responseHeaders.setETag(newETag);
+				return new ResponseEntity<Map<String, Object>>(m, responseHeaders, HttpStatus.NO_CONTENT);
+			} else {
+				if(requestHeaders.getIfMatch().isEmpty()) {
+					m.put("message","If-Match ETag required");
+					return new ResponseEntity<Map<String, Object>>(m, responseHeaders, HttpStatus.PRECONDITION_REQUIRED);
+				}
+				else {
+					responseHeaders.setETag(etag);
+					return new ResponseEntity<Map<String, Object>>(m, responseHeaders, HttpStatus.PRECONDITION_FAILED);
+			
+				}
+			}
+		}
+		else {
+
+		m.put("message", "Invalid Plan Id");
+		return new ResponseEntity<Map<String, Object>>(m, HttpStatus.BAD_REQUEST);
+		}
+	}
 	@GetMapping(value = "/token", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<Map<String, Object>> createToken() {
 		m.clear();
@@ -200,7 +255,7 @@ public class HomeController {
 
 		Calendar calendar = Calendar.getInstance();
 		calendar.setTime(new Date());
-		calendar.add(Calendar.MINUTE, 30);
+		calendar.add(Calendar.MINUTE, 5);
 		Date date = calendar.getTime();
 
 		jsonToken.put("expiry", df.format(date));
