@@ -164,12 +164,12 @@ public class HomeController {
 		{
 			String etag = etagManager.getETag(planJSON);
 			if (etagManager.verifyETag(planJSON, requestHeaders.getIfMatch())) {
-			
-				if (!jedisBean.patch(jsonObject)) {
+				String newETag=jedisBean.patch(jsonObject,planID);
+				if (newETag==null) {
 					m.put("message", "Update failed");
 					return new ResponseEntity<Map<String, Object>>(m, HttpStatus.BAD_REQUEST);
 				}
-				String newETag=etagManager.getETag(jedisBean.read(planID));
+				//String newETag=etagManager.getETag(jedisBean.read(planID));
 				responseHeaders.setETag(newETag);
 				return new ResponseEntity<Map<String, Object>>(m, responseHeaders, HttpStatus.NO_CONTENT);
 			} else {
@@ -255,7 +255,7 @@ public class HomeController {
 
 		Calendar calendar = Calendar.getInstance();
 		calendar.setTime(new Date());
-		calendar.add(Calendar.MINUTE, 5);
+		calendar.add(Calendar.MINUTE, 60);
 		Date date = calendar.getTime();
 
 		jsonToken.put("expiry", df.format(date));

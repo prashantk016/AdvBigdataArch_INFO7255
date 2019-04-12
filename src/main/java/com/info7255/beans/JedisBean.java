@@ -1,14 +1,21 @@
 package com.info7255.beans;
 
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
+import org.elasticsearch.action.delete.DeleteRequest;
+import org.elasticsearch.action.support.WriteRequest;
+import org.elasticsearch.action.update.UpdateRequest;
+import org.elasticsearch.client.RestHighLevelClient;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.info7255.util.Utils;
 
 import io.lettuce.core.RedisException;
 import redis.clients.jedis.Jedis;
@@ -21,7 +28,11 @@ public class JedisBean {
 	private static final String SEP = "____";
 	private static final String redisHost = "localhost";
 	private static final Integer redisPort = 6379;
-	
+	@Autowired
+	private EtagManager etagManager;
+
+	@Autowired
+    private RestHighLevelClient ecClient;
 	public JedisBean() {
 		pool = new JedisPool(redisHost, redisPort);
 	}
@@ -51,8 +62,13 @@ public class JedisBean {
 
 	public String insert(JSONObject jsonObject) {
 		String idOne = jsonObject.getString("objectType") + SEP + jsonObject.getString("objectId");
-		if (insertUtil(jsonObject, idOne))
+		if (insertUtil(jsonObject, idOne)) {
+			Jedis jedis = pool.getResource();
+			jedis.rpush(Utils.IndexAllQueue,jsonObject.toString());
+		    jedis.close();
+
 			return jsonObject.getString("objectId");
+			}
 		else
 			return null;
 	}
@@ -163,7 +179,26 @@ public class JedisBean {
 		}
 	}
 
-	public boolean patch(JSONObject jsonObject) {
+	public String patch(JSONObject jsonObject, String planId) {
+		if (patchUtil(jsonObject)) {
+			JSONObject completeObj = read(planId);
+			try {
+
+				String newETag = etagManager.getETag(completeObj);
+				insert(completeObj);
+				return newETag;
+			} catch (JSONException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+
+		}
+
+		return null;
+
+	}
+	
+	public boolean patchUtil(JSONObject jsonObject) {
 		try {
 			Jedis jedis = pool.getResource();
 			String uuid = jsonObject.getString("objectType") + SEP + jsonObject.getString("objectId");
@@ -188,7 +223,7 @@ public class JedisBean {
 					String setKey = uuid + SEP + edge;
 					String embd_uuid = embdObject.get("objectType") + SEP + embdObject.getString("objectId");
 					jedis.sadd(setKey, embd_uuid);
-					patch(embdObject);
+					patchUtil(embdObject);
 
 				} else if (attributeVal instanceof JSONArray) {
 
@@ -200,7 +235,7 @@ public class JedisBean {
 						JSONObject embdObject = (JSONObject) jsonIterator.next();
 						String embd_uuid = embdObject.get("objectType") + SEP + embdObject.getString("objectId");
 						jedis.sadd(setKey, embd_uuid);
-						patch(embdObject);
+						patchUtil(embdObject);
 					}
 
 				} else {
@@ -233,6 +268,13 @@ public class JedisBean {
 		JSONObject json = new JSONObject(body);
 		if (!json.has("objectType") || !json.has("objectId"))
 			return false;
+		  try {
+			ecClient.delete(new DeleteRequest("insurance","plan",json.getString("objectId") ));
+		} catch (JSONException | IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 		return deleteUtil(json.getString("objectType") + SEP + json.getString("objectId"));
 	}
 
