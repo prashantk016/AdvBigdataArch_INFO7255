@@ -30,7 +30,6 @@ public class ElasticSearchConfiguration {
 
     @Autowired
     private RestHighLevelClient ecClient;
-    private RestClient lowLevelClient;
 
     @Bean
     public RestHighLevelClient ecClient() {
@@ -48,7 +47,6 @@ public class ElasticSearchConfiguration {
 
     	
     	RestHighLevelClient client = new RestHighLevelClient(builder);
-    	lowLevelClient=client.getLowLevelClient();
         return client;
     }
 
